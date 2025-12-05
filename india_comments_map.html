@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>India Comments Map - Sentiment Analysis</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .control-group select,
+        .control-group input {
+            padding: 8px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .control-group select:hover,
+        .control-group input:hover {
+            border-color: #667eea;
+        }
+
+        .map-container {
+            position: relative;
+            padding: 30px;
+            background: white;
+        }
+
+        #map {
+            width: 100%;
+            height: 600px;
+            background: #f0f4f8;
+            border-radius: 10px;
+        }
+
+        .state {
+            fill: #e9ecef;
+            stroke: #fff;
+            stroke-width: 1.5;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .state:hover {
+            stroke-width: 3;
+            stroke: #667eea;
+            filter: brightness(1.1);
+        }
+
+        .state.positive {
+            fill: #28a745;
+            opacity: 0.7;
+        }
+
+        .state.negative {
+            fill: #dc3545;
+            opacity: 0.7;
+        }
+
+        .state.neutral {
+            fill: #6c757d;
+            opacity: 0.7;
+        }
+
+        .state.mixed {
+            fill: #ffc107;
+            opacity: 0.7;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 400px;
+            max-height: 500px;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            font-size: 14px;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+            display: block;
+        }
+
+        .tooltip h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .tooltip .info-item {
+            margin: 8px 0;
+        }
+
+        .tooltip .info-label {
+            font-weight: 600;
+            color: #adb5bd;
+        }
+
+        .tooltip .sentiment-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .sentiment-badge.positive {
+            background: #28a745;
+            color: white;
+        }
+
+        .sentiment-badge.negative {
+            background: #dc3545;
+            color: white;
+        }
+
+        .sentiment-badge.neutral {
+            background: #6c757d;
+            color: white;
+        }
+
+        .comments-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .comment-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+
+        .comment-text {
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .comment-meta {
+            font-size: 11px;
+            color: #adb5bd;
+        }
+
+        .legend {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .legend h4 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .stats {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+        }
+
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10000;
+            display: none;
+        }
+
+        .debug-panel.visible {
+            display: block;
+        }
+
+        .debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10001;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ India Comments Sentiment Map</h1>
+            <p>Hover over regions to see comments and sentiment analysis</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="sentimentFilter">Filter by Sentiment:</label>
+                <select id="sentimentFilter">
+                    <option value="all">All Sentiments</option>
+                    <option value="positive">Positive Only</option>
+                    <option value="negative">Negative Only</option>
+                    <option value="neutral">Neutral Only</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="regionFilter">Filter by Region:</label>
+                <select id="regionFilter">
+                    <option value="all">All Regions</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="dataFile">Data File:</label>
+                <input type="file" id="dataFile" accept=".csv,.json" />
+            </div>
+            <div class="control-group">
+                <label for="mapGeoJsonFile" title="Upload India states GeoJSON if map doesn't load">Map File
+                    (GeoJSON):</label>
+                <input type="file" id="mapGeoJsonFile" accept=".geojson,.json" />
+            </div>
+            <div class="control-group">
+                <button id="loadDefaultBtn"
+                    style="padding: 8px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Load
+                    Default Data</button>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div class="legend">
+                <h4>Legend</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #28a745;"></div>
+                    <span>Positive</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #dc3545;"></div>
+                    <span>Negative</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #6c757d;"></div>
+                    <span>Neutral</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>Mixed</span>
+                </div>
+            </div>
+            <div id="map" class="loading">Loading map...</div>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <button class="debug-toggle" id="debugToggle"
+            onclick="document.getElementById('debugPanel').classList.toggle('visible')">Debug Info</button>
+        <div class="debug-panel" id="debugPanel">
+            <strong>Debug Information</strong><br>
+            <div id="debugContent">Loading...</div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalComments">0</div>
+                <div class="stat-label">Total Comments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="positiveCount">0</div>
+                <div class="stat-label">Positive Comments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="negativeCount">0</div>
+                <div class="stat-label">Negative Comments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="regionsCount">0</div>
+                <div class="stat-label">Regions with Data</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State name mappings (handling variations)
+        const stateNameMap = {
+            'Andhra Pradesh': ['Andhra Pradesh', 'AP', 'Andhra'],
+            'Arunachal Pradesh': ['Arunachal Pradesh', 'Arunachal'],
+            'Assam': ['Assam'],
+            'Bihar': ['Bihar'],
+            'Chhattisgarh': ['Chhattisgarh', 'Chhatisgarh'],
+            'Goa': ['Goa'],
+            'Gujarat': ['Gujarat', 'Gujrat'],
+            'Haryana': ['Haryana'],
+            'Himachal Pradesh': ['Himachal Pradesh', 'Himachal', 'HP'],
+            'Jharkhand': ['Jharkhand'],
+            'Karnataka': ['Karnataka', 'Karnatka'],
+            'Kerala': ['Kerala', 'Keral'],
+            'Madhya Pradesh': ['Madhya Pradesh', 'MP'],
+            'Maharashtra': ['Maharashtra', 'Maharastra'],
+            'Manipur': ['Manipur'],
+            'Meghalaya': ['Meghalaya'],
+            'Mizoram': ['Mizoram'],
+            'Nagaland': ['Nagaland'],
+            'Odisha': ['Odisha', 'Orissa'],
+            'Punjab': ['Punjab'],
+            'Rajasthan': ['Rajasthan', 'Rajastan'],
+            'Sikkim': ['Sikkim'],
+            'Tamil Nadu': ['Tamil Nadu', 'Tamilnadu', 'Tamil Nadu', 'TN'],
+            'Telangana': ['Telangana', 'TG'],
+            'Tripura': ['Tripura'],
+            'Uttar Pradesh': ['Uttar Pradesh', 'UP', 'Uttar Pradesh'],
+            'Uttarakhand': ['Uttarakhand', 'Uttaranchal'],
+            'West Bengal': ['West Bengal', 'WB', 'Bengal'],
+            'Delhi': ['Delhi', 'NCT', 'New Delhi'],
+            'Jammu and Kashmir': ['Jammu and Kashmir', 'J&K', 'Jammu Kashmir'],
+            'Ladakh': ['Ladakh'],
+            'Puducherry': ['Puducherry', 'Pondicherry'],
+            'Chandigarh': ['Chandigarh'],
+            'Dadra and Nagar Haveli': ['Dadra and Nagar Haveli', 'DNH'],
+            'Daman and Diu': ['Daman and Diu', 'DD'],
+            'Lakshadweep': ['Lakshadweep'],
+            'Andaman and Nicobar Islands': ['Andaman and Nicobar Islands', 'A&N']
+        };
+
+        let commentsData = [];
+        let indiaTopoJson = null;
+        let currentFilter = { sentiment: 'all', region: 'all' };
+
+        // Load India GeoJSON with multiple fallback sources
+        async function loadIndiaMap() {
+            const sources = [
+                'https://gist.githubusercontent.com/jbrobst/56c13bbbf9d97d187fea01ca62ea5112/raw/e388c4cae20aa53cb5090210a42ebb9b765c0a36/india_states.geojson',
+                'https://raw.githubusercontent.com/Subhash9325/GeoJson-Data-of-Indian-States/master/Indian_States.json',
+                'https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana_29.geojson',
+                'https://raw.githubusercontent.com/geohacker/india/master/state/india_states.geojson',
+                'india_states.geojson' // Local file fallback
+            ];
+
+            let lastError = null;
+
+            for (const source of sources) {
+                try {
+                    console.log(`Trying to load map from: ${source}`);
+                    const response = await fetch(source);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const geojson = await response.json();
+
+                    if (!geojson || (!geojson.features && !geojson.type)) {
+                        throw new Error('Invalid GeoJSON format');
+                    }
+
+                    // Convert to TopoJSON format for better performance
+                    const topo = topojson.topology({ states: geojson });
+                    indiaTopoJson = topo;
+
+                    console.log('Map loaded successfully from:', source);
+                    drawMap();
+                    return; // Success, exit function
+                } catch (error) {
+                    console.warn(`Failed to load from ${source}:`, error.message);
+                    lastError = error;
+                    continue; // Try next source
+                }
+            }
+
+            // If all sources failed, show error with helpful message
+            console.error('All map sources failed. Last error:', lastError);
+            document.getElementById('map').innerHTML = `
+                <div class="loading">
+                    <h3>⚠️ Map Data Not Available</h3>
+                    <p>Unable to load India map from online sources.</p>
+                    <p><strong>Solutions:</strong></p>
+                    <ol style="text-align: left; max-width: 500px; margin: 20px auto;">
+                        <li>Check if you can access GitHub (raw.githubusercontent.com)</li>
+                        <li>Download a GeoJSON file of India states and save it as <code>india_states.geojson</code> in the same folder</li>
+                        <li>Try using a VPN if GitHub is blocked in your region</li>
+                        <li>Or use the file input below to upload a GeoJSON file</li>
+                    </ol>
+                    <div style="margin-top: 20px;">
+                        <label for="mapFile" style="display: inline-block; padding: 10px 20px; background: #667eea; color: white; border-radius: 8px; cursor: pointer;">
+                            Upload GeoJSON File
+                        </label>
+                        <input type="file" id="mapFile" accept=".geojson,.json" style="display: none;" />
+                    </div>
+                </div>
+            `;
+
+            // Add file upload handler for GeoJSON (use setTimeout to ensure DOM is ready)
+            setTimeout(() => {
+                const mapFileInput = document.getElementById('mapFile');
+                if (mapFileInput) {
+                    mapFileInput.addEventListener('change', function (e) {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = function (event) {
+                                try {
+                                    const geojson = JSON.parse(event.target.result);
+                                    if (!geojson || (!geojson.features && !geojson.type)) {
+                                        throw new Error('Invalid GeoJSON format');
+                                    }
+                                    const topo = topojson.topology({ states: geojson });
+                                    indiaTopoJson = topo;
+                                    document.getElementById('map').innerHTML = '';
+                                    // Only draw if we have comment data
+                                    if (commentsData && commentsData.length > 0) {
+                                        drawMap();
+                                    } else {
+                                        document.getElementById('map').innerHTML = '<div class="loading">Map loaded! Please upload comment data to see visualization.</div>';
+                                    }
+                                } catch (error) {
+                                    console.error('Error parsing GeoJSON:', error);
+                                    alert('Error parsing GeoJSON file: ' + error.message);
+                                }
+                            };
+                            reader.readAsText(file);
+                        }
+                    });
+                }
+            }, 100);
+        }
+
+        // Parse CSV data
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+
+                const values = [];
+                let currentValue = '';
+                let inQuotes = false;
+
+                for (let char of lines[i]) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(currentValue.trim());
+                        currentValue = '';
+                    } else {
+                        currentValue += char;
+                    }
+                }
+                values.push(currentValue.trim());
+
+                if (values.length >= headers.length) {
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header] = values[index] || '';
+                    });
+                    data.push(row);
+                }
+            }
+
+            return data;
+        }
+
+        // Normalize state name
+        function normalizeStateName(region) {
+            if (!region || region === 'All India' || region === 'Unknown Region') {
+                return null;
+            }
+
+            for (const [standardName, variations] of Object.entries(stateNameMap)) {
+                if (variations.some(v => region.toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(region.toLowerCase()))) {
+                    return standardName;
+                }
+            }
+
+            // Try direct match
+            if (stateNameMap[region]) {
+                return region;
+            }
+
+            return region; // Return as-is if no match found
+        }
+
+        // Process comments data
+        function processCommentsData(data) {
+            const regionMap = {};
+
+            data.forEach(comment => {
+                if (!comment.region || !comment.sentiment_label) return;
+
+                const normalizedRegion = normalizeStateName(comment.region);
+                if (!normalizedRegion) {
+                    // For "All India" comments, we can distribute them or skip
+                    return;
+                }
+
+                if (!regionMap[normalizedRegion]) {
+                    regionMap[normalizedRegion] = {
+                        positive: [],
+                        negative: [],
+                        neutral: [],
+                        all: []
+                    };
+                }
+
+                const sentiment = comment.sentiment_label.toLowerCase();
+                regionMap[normalizedRegion].all.push(comment);
+
+                if (sentiment === 'positive') {
+                    regionMap[normalizedRegion].positive.push(comment);
+                } else if (sentiment === 'negative') {
+                    regionMap[normalizedRegion].negative.push(comment);
+                } else {
+                    regionMap[normalizedRegion].neutral.push(comment);
+                }
+            });
+
+            return regionMap;
+        }
+
+        // Helper function to get state name from GeoJSON properties (global scope)
+        function getStateNameFromGeoJson(d) {
+            // Try various possible property names
+            const props = d.properties;
+            return props.NAME_1 || props.name || props.NAME || props.ST_NM || props.state_name ||
+                props.State || props.STATE || props.State_Name || props.NAME_2 || '';
+        }
+
+        // Helper function to normalize GeoJSON state name to match our data (global scope)
+        function normalizeGeoJsonStateName(geoName, regionData) {
+            if (!geoName || !regionData) return null;
+
+            // Clean the name
+            const cleanName = geoName.trim();
+
+            // First try direct match
+            if (regionData[cleanName]) return cleanName;
+
+            // Try case-insensitive exact match
+            for (const key in regionData) {
+                if (key.toLowerCase() === cleanName.toLowerCase()) {
+                    return key;
+                }
+            }
+
+            // Try normalization using stateNameMap
+            const normalized = normalizeStateName(cleanName);
+            if (normalized && regionData[normalized]) return normalized;
+
+            // Try removing common suffixes/prefixes and matching
+            const nameVariations = [
+                cleanName.replace(/\s+and\s+/gi, ' & '),
+                cleanName.replace(/\s+&\s+/gi, ' and '),
+                cleanName.replace(/\s+/g, ' '),
+            ];
+
+            for (const variation of nameVariations) {
+                for (const key in regionData) {
+                    if (key.toLowerCase() === variation.toLowerCase()) {
+                        return key;
+                    }
+                }
+            }
+
+            // Try partial match (contains)
+            for (const key in regionData) {
+                const keyLower = key.toLowerCase();
+                const nameLower = cleanName.toLowerCase();
+                if (nameLower.includes(keyLower) || keyLower.includes(nameLower)) {
+                    // Make sure it's a reasonable match (at least 5 characters)
+                    if (Math.min(keyLower.length, nameLower.length) >= 5) {
+                        return key;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // Draw the map
+        function drawMap() {
+            if (!indiaTopoJson || !commentsData.length) return;
+
+            const svg = d3.select('#map')
+                .html('')
+                .append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', '0 0 800 1000')
+                .attr('preserveAspectRatio', 'xMidYMid meet');
+
+            const projection = d3.geoMercator()
+                .center([82, 23])
+                .scale(1000)
+                .translate([400, 500]);
+
+            const path = d3.geoPath().projection(projection);
+
+            const regionData = processCommentsData(commentsData);
+
+            // Convert TopoJSON back to GeoJSON for rendering
+            const states = topojson.feature(indiaTopoJson, indiaTopoJson.objects.states);
+
+            // Debug: Log first state to see property names
+            if (states.features.length > 0) {
+                console.log('Sample GeoJSON state properties:', states.features[0].properties);
+                console.log('Available region data keys:', Object.keys(regionData));
+                console.log('Total states in GeoJSON:', states.features.length);
+                console.log('Total regions with data:', Object.keys(regionData).length);
+
+                // Log all GeoJSON state names
+                const geoStateNames = states.features.map(d => getStateNameFromGeoJson(d)).filter(n => n);
+                console.log('GeoJSON state names (first 10):', geoStateNames.slice(0, 10));
+            }
+
+            svg.selectAll('.state')
+                .data(states.features)
+                .enter()
+                .append('path')
+                .attr('class', 'state')
+                .attr('d', path)
+                .attr('data-state', d => getStateNameFromGeoJson(d))
+                .on('mouseover', function (event, d) {
+                    const geoStateName = getStateNameFromGeoJson(d);
+                    const matchedStateName = normalizeGeoJsonStateName(geoStateName, regionData);
+                    const stateData = matchedStateName ? regionData[matchedStateName] : null;
+
+                    console.log('Hover detected:', {
+                        geoStateName: geoStateName,
+                        matchedStateName: matchedStateName,
+                        hasData: !!stateData,
+                        dataLength: stateData ? stateData.all.length : 0
+                    });
+
+                    if (stateData && stateData.all.length > 0) {
+                        showTooltip(event, matchedStateName || geoStateName, stateData);
+                        d3.select(this).attr('stroke-width', 4);
+                    } else {
+                        // Show tooltip even if no data, to indicate which state
+                        if (geoStateName) {
+                            showTooltip(event, geoStateName, null);
+                        }
+                    }
+                })
+                .on('mousemove', function (event) {
+                    const tooltip = d3.select('#tooltip');
+                    tooltip
+                        .style('left', (event.pageX + 10) + 'px')
+                        .style('top', (event.pageY - 10) + 'px');
+                })
+                .on('mouseout', function () {
+                    hideTooltip();
+                    d3.select(this).attr('stroke-width', 1.5);
+                })
+                .each(function (d) {
+                    const geoStateName = getStateNameFromGeoJson(d);
+                    const matchedStateName = normalizeGeoJsonStateName(geoStateName, regionData);
+                    const stateData = matchedStateName ? regionData[matchedStateName] : null;
+
+                    if (stateData && stateData.all.length > 0) {
+                        const total = stateData.all.length;
+                        const positive = stateData.positive.length;
+                        const negative = stateData.negative.length;
+                        const neutral = stateData.neutral.length;
+
+                        // Determine dominant sentiment
+                        let dominantSentiment = 'neutral';
+                        if (positive > negative && positive > neutral) {
+                            dominantSentiment = 'positive';
+                        } else if (negative > positive && negative > neutral) {
+                            dominantSentiment = 'negative';
+                        } else if (positive > 0 && negative > 0) {
+                            dominantSentiment = 'mixed';
+                        }
+
+                        d3.select(this)
+                            .classed(dominantSentiment, true)
+                            .attr('title', `${matchedStateName || geoStateName}: ${total} comments`);
+                    } else {
+                        // Debug: log unmatched states (only first few to avoid spam)
+                        if (geoStateName && Math.random() < 0.1) { // Log ~10% of unmatched states
+                            console.log(`No data found for state: "${geoStateName}" (tried matching with: ${matchedStateName || 'none'})`);
+                        }
+                    }
+                });
+
+            // Log matching results
+            const matchedStates = states.features.filter(d => {
+                const geoName = getStateNameFromGeoJson(d);
+                return normalizeGeoJsonStateName(geoName, regionData) !== null;
+            }).length;
+            console.log(`Matched ${matchedStates} out of ${states.features.length} states with comment data`);
+
+            // Update debug panel
+            updateDebugPanel(states, regionData);
+
+            updateStats(regionData);
+            updateRegionFilter(regionData);
+        }
+
+        // Update debug panel
+        function updateDebugPanel(states, regionData) {
+            const debugContent = document.getElementById('debugContent');
+            if (!debugContent) return;
+
+            const geoStateNames = states.features.map(d => getStateNameFromGeoJson(d)).filter(n => n);
+            const dataRegionNames = Object.keys(regionData);
+
+            let matchedCount = 0;
+            const matches = [];
+            const unmatched = [];
+
+            geoStateNames.forEach(geoName => {
+                const matched = normalizeGeoJsonStateName(geoName, regionData);
+                if (matched) {
+                    matchedCount++;
+                    matches.push(`${geoName} → ${matched}`);
+                } else {
+                    unmatched.push(geoName);
+                }
+            });
+
+            debugContent.innerHTML = `
+                <strong>Matching Status:</strong><br>
+                GeoJSON States: ${geoStateNames.length}<br>
+                Data Regions: ${dataRegionNames.length}<br>
+                Matched: ${matchedCount}<br>
+                <br>
+                <strong>Sample Matches:</strong><br>
+                ${matches.slice(0, 5).join('<br>')}
+                ${matches.length > 5 ? '<br>...' : ''}
+                ${unmatched.length > 0 ? `<br><br><strong>Unmatched (first 3):</strong><br>${unmatched.slice(0, 3).join('<br>')}` : ''}
+            `;
+        }
+
+        // Show tooltip
+        function showTooltip(event, stateName, stateData) {
+            const tooltip = d3.select('#tooltip');
+
+            if (!tooltip.node()) {
+                console.error('Tooltip element not found!');
+                return;
+            }
+
+            // If no data, show a simple message
+            if (!stateData || !stateData.all || stateData.all.length === 0) {
+                tooltip.html(`
+                    <h3>${stateName}</h3>
+                    <div class="info-item">
+                        <span class="info-label">No comment data available for this region</span>
+                    </div>
+                `)
+                    .classed('visible', true)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px')
+                    .style('display', 'block')
+                    .style('opacity', '1')
+                    .style('z-index', '10000');
+                return;
+            }
+
+            const total = stateData.all.length;
+            const positive = stateData.positive ? stateData.positive.length : 0;
+            const negative = stateData.negative ? stateData.negative.length : 0;
+            const neutral = stateData.neutral ? stateData.neutral.length : 0;
+
+            // Get sample comments (up to 3)
+            const sampleComments = stateData.all.slice(0, 3);
+
+            let commentsHtml = '';
+            sampleComments.forEach(comment => {
+                const sentimentClass = (comment.sentiment_label || comment.sentiment || 'neutral').toLowerCase();
+                const commentText = comment.text || comment.comment_text || 'No text available';
+                const videoTitle = comment.video_title || 'N/A';
+                commentsHtml += `
+                    <div class="comment-item">
+                        <div class="comment-text">${commentText.substring(0, 100)}${commentText.length > 100 ? '...' : ''}</div>
+                        <div class="comment-meta">
+                            <span class="sentiment-badge ${sentimentClass}">${comment.sentiment_label || comment.sentiment || 'neutral'}</span>
+                            <span style="margin-left: 10px;">Video: ${videoTitle}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            tooltip.html(`
+                <h3>${stateName}</h3>
+                <div class="info-item">
+                    <span class="info-label">Total Comments:</span> ${total}
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Positive:</span> ${positive} | 
+                    <span class="info-label">Negative:</span> ${negative} | 
+                    <span class="info-label">Neutral:</span> ${neutral}
+                </div>
+                <div class="comments-list">
+                    <strong>Sample Comments:</strong>
+                    ${commentsHtml}
+                    ${total > 3 ? `<div style="margin-top: 10px; font-size: 11px; color: #adb5bd;">+ ${total - 3} more comments</div>` : ''}
+                </div>
+            `)
+                .classed('visible', true)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 10) + 'px')
+                .style('display', 'block')
+                .style('opacity', '1')
+                .style('z-index', '10000');
+        }
+
+        // Hide tooltip
+        function hideTooltip() {
+            const tooltip = d3.select('#tooltip');
+            tooltip.classed('visible', false);
+            tooltip.style('opacity', '0');
+        }
+
+        // Update statistics
+        function updateStats(regionData) {
+            let totalComments = 0;
+            let positiveCount = 0;
+            let negativeCount = 0;
+            const regionsWithData = Object.keys(regionData).length;
+
+            Object.values(regionData).forEach(data => {
+                totalComments += data.all.length;
+                positiveCount += data.positive.length;
+                negativeCount += data.negative.length;
+            });
+
+            document.getElementById('totalComments').textContent = totalComments.toLocaleString();
+            document.getElementById('positiveCount').textContent = positiveCount.toLocaleString();
+            document.getElementById('negativeCount').textContent = negativeCount.toLocaleString();
+            document.getElementById('regionsCount').textContent = regionsWithData;
+        }
+
+        // Update region filter dropdown
+        function updateRegionFilter(regionData) {
+            const select = document.getElementById('regionFilter');
+            const regions = Object.keys(regionData).sort();
+
+            // Clear existing options except "All Regions"
+            select.innerHTML = '<option value="all">All Regions</option>';
+
+            regions.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region;
+                option.textContent = `${region} (${regionData[region].all.length} comments)`;
+                select.appendChild(option);
+            });
+        }
+
+        // Handle map GeoJSON file upload
+        const mapGeoJsonInput = document.getElementById('mapGeoJsonFile');
+        if (mapGeoJsonInput) {
+            mapGeoJsonInput.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        try {
+                            const geojson = JSON.parse(event.target.result);
+                            if (!geojson || (!geojson.features && !geojson.type)) {
+                                throw new Error('Invalid GeoJSON format. Expected FeatureCollection or object with features.');
+                            }
+                            const topo = topojson.topology({ states: geojson });
+                            indiaTopoJson = topo;
+                            document.getElementById('map').innerHTML = '';
+                            // Only draw if we have comment data
+                            if (commentsData && commentsData.length > 0) {
+                                drawMap();
+                            } else {
+                                document.getElementById('map').innerHTML = '<div class="loading">Map loaded successfully! Please upload comment data (CSV/JSON) to see the visualization.</div>';
+                            }
+                        } catch (error) {
+                            console.error('Error parsing GeoJSON:', error);
+                            alert('Error parsing GeoJSON file: ' + error.message + '\n\nPlease ensure the file is a valid GeoJSON format.');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            });
+        }
+
+        // Handle file upload
+        document.getElementById('dataFile').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    if (file.name.endsWith('.json')) {
+                        // Load JSON file
+                        try {
+                            const jsonData = JSON.parse(event.target.result);
+                            loadJSONData(jsonData);
+                        } catch (error) {
+                            alert('Error parsing JSON file: ' + error.message);
+                        }
+                    } else {
+                        // Load CSV file
+                        commentsData = parseCSV(event.target.result);
+                        drawMap();
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Load JSON data (processed format)
+        function loadJSONData(jsonData) {
+            // Convert JSON format to our internal format
+            commentsData = [];
+
+            if (jsonData.regions) {
+                Object.keys(jsonData.regions).forEach(region => {
+                    const regionData = jsonData.regions[region];
+                    // Handle both formats: comments array or all_comments_count
+                    const comments = regionData.comments || [];
+
+                    comments.forEach(comment => {
+                        commentsData.push({
+                            ...comment,
+                            region: region,
+                            sentiment_label: comment.sentiment || comment.sentiment_label || 'neutral'
+                        });
+                    });
+                });
+            }
+
+            console.log(`Loaded ${commentsData.length} comments from JSON`);
+            console.log('Regions in JSON:', Object.keys(jsonData.regions || {}));
+
+            drawMap();
+        }
+
+        // Load default data button
+        document.getElementById('loadDefaultBtn').addEventListener('click', function () {
+            loadDefaultData();
+        });
+
+        // Handle filter changes
+        document.getElementById('sentimentFilter').addEventListener('change', function (e) {
+            currentFilter.sentiment = e.target.value;
+            // Re-draw map with filter (implementation can be added)
+            drawMap();
+        });
+
+        // Load default data file if available
+        async function loadDefaultData() {
+            try {
+                // First try to load processed JSON
+                const jsonResponse = await fetch('comments_map_data.json');
+                if (jsonResponse.ok) {
+                    const jsonData = await jsonResponse.json();
+                    loadJSONData(jsonData);
+                    return;
+                }
+            } catch (error) {
+                console.log('JSON file not found, trying CSV...');
+            }
+
+            try {
+                // Try to load the most recent CSV file
+                const response = await fetch('youtube_sentiment_analysis_20251122_122916/sentiment_analysis_data_20251122_122916.csv');
+                if (response.ok) {
+                    const csvText = await response.text();
+                    commentsData = parseCSV(csvText);
+                    drawMap();
+                } else {
+                    alert('Default data file not found. Please upload a CSV or JSON file using the file input above.');
+                }
+            } catch (error) {
+                console.log('Default data file not found. Please upload a CSV or JSON file.');
+                alert('Default data file not found. Please upload a CSV or JSON file using the file input above.');
+            }
+        }
+
+        // Initialize
+        loadIndiaMap().then(() => {
+            loadDefaultData();
+        });
+    </script>
+</body>
+
+</html>
